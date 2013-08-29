@@ -16,70 +16,70 @@ extern "C" {
 template<typename AllocationPolicy, typename FreePolicy, typename AdoptionPolicy>
 class PZVal : private AllocationPolicy, private FreePolicy, private AdoptionPolicy {
 public:
-	static PZVal createPZValNull(void)
+	static PZVal create(void)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_NULL(z);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValLong(long int v)
+	static PZVal create(long int v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_LONG(z, v);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValDouble(double v)
+	static PZVal createFromDouble(double v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_DOUBLE(z, v);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValBool(bool v)
+	static PZVal createFromBool(bool v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_BOOL(z, v);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValResource(long int v)
+	static PZVal createFromResource(long int v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_RESOURCE(z, v);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValString(const char* s)
+	static PZVal create(const char* s)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_STRING(z, s, 1);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValString(const char* s, std::size_t len)
+	static PZVal create(const char* s, std::size_t len)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_STRINGL(z, s, len, 1);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValFromString(const char* s)
+	static PZVal createFromString(const char* s)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_STRING(z, s, 0);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValFromString(const char* s, uint len)
+	static PZVal createFromString(const char* s, uint len)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_STRINGL(z, s, len, 0);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValFromInternedString(const char* s)
+	static PZVal createFromInternedString(const char* s)
 	{
 		zval* z = AllocationPolicy::allocate();
 #if PHP_VERSION_ID < 50400
@@ -92,35 +92,28 @@ public:
 			ZVAL_STRING(z, s, 1);
 		}
 #endif
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValArray(void)
-	{
-		zval* z = AllocationPolicy::allocate();
-		array_init(z);
-		return PZVal(z);
-	}
-
-	static PZVal createPZValArray(uint size)
+	static PZVal createArray(uint size = 0)
 	{
 		zval* z = AllocationPolicy::allocate();
 		array_init_size(z, size);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValStdClass(TSRMLS_D)
+	static PZVal createStdClass(TSRMLS_D)
 	{
 		zval* z = AllocationPolicy::allocate();
 		object_init(z);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
-	static PZVal createPZValObject(zend_class_entry* ce TSRMLS_DC)
+	static PZVal createObject(zend_class_entry* ce TSRMLS_DC)
 	{
 		zval* z = AllocationPolicy::allocate();
 		object_init_ex(z, ce);
-		return PZVal(z);
+		return PZVal(z, 1);
 	}
 
 	explicit PZVal(zval* z)
@@ -139,7 +132,7 @@ public:
 
 	~PZVal(void)
 	{
-		FreePolicy::deallocate(this->m_z);
+		FreePolicy::destroy(this->m_z);
 	}
 
 	operator zval*(void)
@@ -382,25 +375,70 @@ public:
 		}
 	}
 
-	char* asString(void)
+	char* asString(bool convert = true)
 	{
-		switch (this->type()) {
-			case IS_NULL:
-				return STR_EMPTY_ALLOC();
+		if (convert) {
+			switch (this->type()) {
+				case IS_NULL:
+					return STR_EMPTY_ALLOC();
 
-			case IS_STRING:
-				return estrndup(Z_STRVAL_P(this->m_z), Z_STRLEN_P(this->m_z));
+				case IS_STRING:
+					return estrndup(Z_STRVAL_P(this->m_z), Z_STRLEN_P(this->m_z));
 
-			default: {
-				zval copy;
-				ZVAL_COPY_VALUE(&copy, this->m_z);
-				zval_copy_ctor(&copy);
-				convert_to_string(&copy);
-				char* res = estrndup(Z_STRVAL(copy), Z_STRLEN(copy));
-				zval_dtor(&copy);
-				return res;
+				default: {
+					zval copy;
+					ZVAL_COPY_VALUE(&copy, this->m_z);
+					zval_copy_ctor(&copy);
+					convert_to_string(&copy);
+					char* res = estrndup(Z_STRVAL(copy), Z_STRLEN(copy));
+					zval_dtor(&copy);
+					return res;
+				}
 			}
 		}
+		else {
+			return (this->type() == IS_STRING) ? Z_STRVAL_P(this->m_z) : 0;
+		}
+	}
+
+	bool getBool(void) const
+	{
+		return Z_BVAL_P(this->m_z);
+	}
+
+	long int getLong(void) const
+	{
+		return Z_LVAL_P(this->m_z);
+	}
+
+	long int getResource(void) const
+	{
+		return Z_RESVAL_P(this->m_z);
+	}
+
+	double getDouble(void) const
+	{
+		return Z_DVAL_P(this->m_z);
+	}
+
+	char* getString(void)
+	{
+		return Z_STRVAL_P(this->m_z);
+	}
+
+	const char* getString(void) const
+	{
+		return Z_STRVAL_P(this->m_z);
+	}
+
+	int getStringLength(void) const
+	{
+		return Z_STRLEN_P(this->m_z);
+	}
+
+	HashTable* getHashTable(void)
+	{
+		return Z_ARRVAL_P(this->m_z);
 	}
 
 	void toInt(void)
@@ -638,6 +676,14 @@ public:
 
 protected:
 	zval* m_z;
+
+	PZVal(zval* z, int)
+		: m_z(z)
+	{
+	}
 };
+
+typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> StdPZVal;
+typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyNone, ZValAdoptionPolicyWriteThrough> PZValWrapper;
 
 #endif /* PZVAL_H_ */

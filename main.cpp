@@ -1,17 +1,13 @@
-#include <iostream>
-#include "embed.h"
+#include <memory>
+#include <cstdlib>
+#include <cpptest.h>
+#include "tests/Test_PZVal.h"
 
 int main(int, char**)
 {
-	embed_startup(__func__);
-	zend_first_try {
+	Test::Suite ts;
+	ts.add(std::auto_ptr<Test::Suite>(new Test_PZVal()));
+	Test::TextOutput output(Test::TextOutput::Verbose);
 
-	}
-	zend_catch {
-		std::cerr << "Bail out" << std::endl;
-	}
-	zend_end_try();
-	embed_shutdown();
-
-	return 0;
+	return ts.run(output) ? EXIT_SUCCESS : EXIT_FAILURE;;
 }
