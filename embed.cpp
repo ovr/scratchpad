@@ -6,7 +6,7 @@
 #include "extension.h"
 
 #ifdef ZTS
-static void*** tsrm_ls;
+void*** tsrm_ls;
 #endif
 
 zend_uint leaks;
@@ -55,7 +55,7 @@ int startup_php(void)
 {
 #ifdef ZTS
 	tsrm_startup(1, 1, 0, NULL);
-	tsrm_ls   = ts_resource(0);
+	tsrm_ls   = static_cast<void***>(ts_resource(0));
 #endif
 	char location[] = "-";
 

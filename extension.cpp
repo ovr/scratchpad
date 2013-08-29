@@ -1,6 +1,6 @@
 #include <iostream>
 #include "php_wolf.h"
-#include "PZVal.h"
+#include "zval/PZVal.h"
 #include "HashTable.h"
 #include "HashTableIterator.h"
 #include "EMallocAllocator.h"

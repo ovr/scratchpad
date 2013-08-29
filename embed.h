@@ -4,6 +4,10 @@
 extern "C" {
 #include <main/php.h>
 
+#ifdef ZTS
+extern void*** tsrm_ls;
+#endif
+
 extern zend_uint leaks;
 extern int memclean_called;
 #if PHP_VERSION_ID < 50400

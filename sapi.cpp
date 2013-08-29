@@ -51,7 +51,7 @@ static void embed_register_variables(zval* track_vars_array TSRMLS_DC)
 	php_import_environment_variables(track_vars_array TSRMLS_CC);
 }
 
-static void embed_log_message(char* message)
+static void embed_log_message(char* message TSRMLS_DC)
 {
 	std::cerr << message << std::endl;
 }
