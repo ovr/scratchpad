@@ -1,11 +1,13 @@
 #ifndef ZVAL_ADOPTIONPOLICIES_H_
 #define ZVAL_ADOPTIONPOLICIES_H_
 
+extern "C" {
 #include <Zend/zend.h>
+}
 
 class ZValAdoptionPolicyRef {
 public:
-	static void adopt(zval*& target, zval* other)
+	static void adopt(zval*& target, zval*& other)
 	{
 		Z_ADDREF_P(other);
 		target = other;
@@ -14,7 +16,7 @@ public:
 
 class ZValAdoptionPolicyCopy {
 public:
-	static void adopt(zval*& target, zval* other)
+	static void adopt(zval*& target, zval*& other)
 	{
 		Z_ADDREF_P(other);
 		INIT_PZVAL(target);
@@ -28,7 +30,7 @@ public:
 
 class ZValAdoptionPolicyWriteThrough {
 public:
-	static void adopt(zval*& target, zval* other)
+	static void adopt(zval*& target, zval*& other)
 	{
 		target = other;
 	}

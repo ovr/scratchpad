@@ -14,12 +14,19 @@ extern "C" {
 #include "HashTable.h"
 
 template<typename AllocationPolicy, typename FreePolicy, typename AdoptionPolicy>
-class PZVal : private AllocationPolicy, private FreePolicy, private AdoptionPolicy {
+class PZVal {
 public:
 	static PZVal create(void)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_NULL(z);
+		return PZVal(z, 1);
+	}
+
+	static PZVal create(int v)
+	{
+		zval* z = AllocationPolicy::allocate();
+		ZVAL_LONG(z, v);
 		return PZVal(z, 1);
 	}
 
@@ -30,14 +37,14 @@ public:
 		return PZVal(z, 1);
 	}
 
-	static PZVal createFromDouble(double v)
+	static PZVal create(double v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_DOUBLE(z, v);
 		return PZVal(z, 1);
 	}
 
-	static PZVal createFromBool(bool v)
+	static PZVal create(bool v)
 	{
 		zval* z = AllocationPolicy::allocate();
 		ZVAL_BOOL(z, v);
@@ -116,6 +123,11 @@ public:
 		return PZVal(z, 1);
 	}
 
+	PZVal(void)
+		: m_z(0)
+	{
+	}
+
 	explicit PZVal(zval* z)
 		: m_z(0)
 	{
@@ -127,7 +139,15 @@ public:
 	PZVal(const PZVal<I, D, A>& other)
 		: m_z(0)
 	{
-		A::adopt(this->m_z, other.m_z);
+		zval* tmp = const_cast<zval*>(other.m_z);
+		A::adopt(this->m_z, tmp);
+	}
+
+	PZVal(const PZVal& other)
+		: m_z(0)
+	{
+		zval* tmp = const_cast<zval*>(other.m_z);
+		AdoptionPolicy::adopt(this->m_z, tmp);
 	}
 
 	~PZVal(void)
@@ -140,7 +160,7 @@ public:
 		return this->m_z;
 	}
 
-	operator const zval*(void) const
+	operator zval*(void) const
 	{
 		return this->m_z;
 	}
@@ -210,29 +230,48 @@ public:
 		return Z_TYPE_P(this->m_z) <= IS_BOOL;
 	}
 
+	template<typename I, typename D, typename A>
+	PZVal& operator=(const PZVal<I, D, A>& other)
+	{
+		assert(this->m_z != NULL);
+
+		if (this->refCount() != 1) {
+			this->delRef();
+			this->m_z = AllocationPolicy::allocate();
+		}
+		else {
+			zval_dtor(this->m_z);
+		}
+
+		zval* tmp = const_cast<zval*>(other);
+		AdoptionPolicy::adopt(this->m_z, tmp);
+		return *this;
+	}
+
 	PZVal& operator=(const PZVal& other)
 	{
 		assert(this->m_z != NULL);
 
 		if (this->refCount() != 1) {
 			this->delRef();
-			ALLOC_ZVAL(this->m_z);
+			this->m_z = AllocationPolicy::allocate();
 		}
 		else {
 			zval_dtor(this->m_z);
 		}
 
-		AdoptionPolicy::adopt(this->m_z, other.m_z);
+		zval* tmp = const_cast<zval*>(other.m_z);
+		AdoptionPolicy::adopt(this->m_z, tmp);
 		return *this;
 	}
 
-	PZVal& operator=(const zval* other)
+	PZVal& operator=(zval* other)
 	{
 		assert(this->m_z != NULL);
 
 		if (this->refCount() != 1) {
 			this->delRef();
-			ALLOC_ZVAL(this->m_z);
+			this->m_z = AllocationPolicy::allocate();
 		}
 		else {
 			zval_dtor(this->m_z);
@@ -241,6 +280,13 @@ public:
 
 		AdoptionPolicy::adopt(this->m_z, other);
 		return *this;
+	}
+
+	PZVal& operator=(int v)
+	{
+		zval tmp = zval_used_for_init;
+		ZVAL_LONG(&tmp, v);
+		return this->operator=(&tmp);
 	}
 
 	PZVal& operator=(long int v)
@@ -505,13 +551,13 @@ public:
 		return PZVal(tmp);
 	}
 
-	friend PZVal operator+(const PZVal& lhs, const PZVal& rhs)
+	friend PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> operator+(const PZVal& lhs, const PZVal& rhs)
 	{
-		zval* tmp;
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
+		zval* tmp = ZValAllocationPolicyPerRequest::allocate();
 		TSRMLS_FETCH();
-		MAKE_STD_ZVAL(tmp);
 		add_function(tmp, const_cast<PZVal&>(lhs), const_cast<PZVal&>(rhs) TSRMLS_CC);
-		return PZVal(tmp);
+		return PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef>(tmp, 1);
 	}
 
 	friend PZVal operator-(const PZVal& lhs, const PZVal& rhs)
@@ -520,7 +566,7 @@ public:
 		TSRMLS_FETCH();
 		MAKE_STD_ZVAL(tmp);
 		sub_function(tmp, const_cast<PZVal&>(lhs), const_cast<PZVal&>(rhs) TSRMLS_CC);
-		return PZVal(tmp);
+		return PZVal(tmp, 1);
 	}
 
 	friend PZVal operator*(const PZVal& lhs, const PZVal& rhs)
