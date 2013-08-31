@@ -132,22 +132,22 @@ public:
 		: m_z(0)
 	{
 		assert(z != 0);
-		AdoptionPolicy::adopt(this->m_z, z);
+		AdoptionPolicy::adopt(&this->m_z, z);
 	}
 
 	template<typename I, typename D, typename A>
 	PZVal(const PZVal<I, D, A>& other)
 		: m_z(0)
 	{
-		zval* tmp = const_cast<zval*>(other.m_z);
-		A::adopt(this->m_z, tmp);
+		zval* tmp = other.m_z;
+		AdoptionPolicy::adopt(&this->m_z, tmp);
 	}
 
 	PZVal(const PZVal& other)
 		: m_z(0)
 	{
-		zval* tmp = const_cast<zval*>(other.m_z);
-		AdoptionPolicy::adopt(this->m_z, tmp);
+		zval* tmp = other.m_z;
+		AdoptionPolicy::adopt(&this->m_z, tmp);
 	}
 
 	~PZVal(void)
@@ -233,104 +233,65 @@ public:
 	template<typename I, typename D, typename A>
 	PZVal& operator=(const PZVal<I, D, A>& other)
 	{
-		assert(this->m_z != NULL);
-
-		if (this->refCount() != 1) {
-			this->delRef();
-			this->m_z = AllocationPolicy::allocate();
-		}
-		else {
-			zval_dtor(this->m_z);
-		}
-
-		zval* tmp = const_cast<zval*>(other);
-		AdoptionPolicy::adopt(this->m_z, tmp);
-		return *this;
+		zval* tmp = other;
+		return this->operator=(tmp);
 	}
 
 	PZVal& operator=(const PZVal& other)
 	{
-		assert(this->m_z != NULL);
-
-		if (this->refCount() != 1) {
-			this->delRef();
-			this->m_z = AllocationPolicy::allocate();
-		}
-		else {
-			zval_dtor(this->m_z);
-		}
-
-		zval* tmp = const_cast<zval*>(other.m_z);
-		AdoptionPolicy::adopt(this->m_z, tmp);
-		return *this;
+		zval* tmp = other;
+		return this->operator=(tmp);
 	}
 
 	PZVal& operator=(zval* other)
 	{
-		assert(this->m_z != NULL);
+		this->prepareToAssignment();
 
-		if (this->refCount() != 1) {
-			this->delRef();
-			this->m_z = AllocationPolicy::allocate();
-		}
-		else {
-			zval_dtor(this->m_z);
-			INIT_PZVAL(this->m_z);
-		}
-
-		AdoptionPolicy::adopt(this->m_z, other);
+		AdoptionPolicy::adopt(&this->m_z, other);
 		return *this;
 	}
 
 	PZVal& operator=(int v)
 	{
-		zval tmp = zval_used_for_init;
-		ZVAL_LONG(&tmp, v);
-		return this->operator=(&tmp);
+		return this->operator=(static_cast<long int>(v));
 	}
 
 	PZVal& operator=(long int v)
 	{
-		zval tmp = zval_used_for_init;
-		ZVAL_LONG(&tmp, v);
-		return this->operator=(&tmp);
+		this->prepareToAssignment();
+
+		ZVAL_LONG(this->m_z, v);
+		return *this;
 	}
 
 	PZVal& operator=(double v)
 	{
-		zval tmp = zval_used_for_init;
-		ZVAL_DOUBLE(&tmp, v);
-		return this->operator=(&tmp);
+		this->prepareToAssignment();
+
+		ZVAL_DOUBLE(this->m_z, v);
+		return *this;
 	}
 
 	PZVal& operator=(bool v)
 	{
-		zval tmp = zval_used_for_init;
-		ZVAL_BOOL(&tmp, v);
-		return this->operator=(&tmp);
+		this->prepareToAssignment();
+		ZVAL_BOOL(this->m_z, v);
+		return *this;
 	}
 
 	PZVal& operator=(const char* s)
 	{
-		zval tmp = zval_used_for_init;
-		ZVAL_STRING(&tmp, s, 0);
-		return this->operator=(&tmp);
+		this->prepareToAssignment();
+		ZVAL_STRING(this->m_z, s, 0);
+		return *this;
 	}
 
 	void ref(const PZVal& other)
 	{
-		if (this->refCount() != 1) {
-			this->delRef();
-		}
-		else {
-			zval_dtor(this->m_z);
-		}
-
-		this->m_z = other.m_z;
-		Z_ADDREF_P(this->m_z);
+		this->ref(other.m_z);
 	}
 
-	void ref(zval* other)
+	void ref(const zval* other)
 	{
 		if (this->refCount() != 1) {
 			this->delRef();
@@ -551,15 +512,6 @@ public:
 		return PZVal(tmp);
 	}
 
-	friend PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> operator+(const PZVal& lhs, const PZVal& rhs)
-	{
-		std::cout << __PRETTY_FUNCTION__ << std::endl;
-		zval* tmp = ZValAllocationPolicyPerRequest::allocate();
-		TSRMLS_FETCH();
-		add_function(tmp, const_cast<PZVal&>(lhs), const_cast<PZVal&>(rhs) TSRMLS_CC);
-		return PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef>(tmp, 1);
-	}
-
 	friend PZVal operator-(const PZVal& lhs, const PZVal& rhs)
 	{
 		zval* tmp;
@@ -727,9 +679,76 @@ protected:
 		: m_z(z)
 	{
 	}
+
+	void prepareToAssignment(void)
+	{
+		assert(this->m_z != NULL);
+
+		if (this->refCount() != 1) {
+			this->delRef();
+			this->m_z = ZValAllocationPolicyPerRequest::allocate();
+		}
+		else {
+			zval_dtor(this->m_z);
+		}
+	}
 };
 
-typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> StdPZVal;
+class StdPZVal : public PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> {
+private:
+	typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> parent;
+public:
+	StdPZVal(void)
+		: parent()
+	{
+	}
+
+	explicit StdPZVal(zval* z)
+		: parent(z)
+	{
+	}
+
+	template<typename I, typename D, typename A>
+	StdPZVal(const PZVal<I, D, A>& other)
+		: parent(other)
+	{
+	}
+
+//	template<typename I, typename D, typename A>
+//	StdPZVal& operator=(const PZVal<I, D, A>& other)
+//	{
+//		assert(this->m_z != NULL);
+//
+//		if (this->refCount() != 1) {
+//			this->delRef();
+//			this->m_z = ZValAllocationPolicyPerRequest::allocate();
+//		}
+//		else {
+//			zval_dtor(this->m_z);
+//		}
+//
+//		zval* tmp = const_cast<zval*>(other);
+//		ZValAdoptionPolicyRef::adopt(&this->m_z, tmp);
+//		return *this;
+//	}
+
+	template<typename I1, typename D1, typename A1, typename I2, typename D2, typename A2>
+	friend StdPZVal operator+(const PZVal<I1, D1, A1>& lhs, const PZVal<I2, D2, A2>& rhs)
+	{
+		zval* tmp = ZValAllocationPolicyPerRequest::allocate();
+		TSRMLS_FETCH();
+		add_function(tmp, const_cast<PZVal<I1, D1, A1>& >(lhs), const_cast<PZVal<I2, D2, A2>& >(rhs) TSRMLS_CC);
+		return StdPZVal(tmp, 1);
+	}
+
+protected:
+	StdPZVal(zval* z, int)
+		: PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef>(z, 1)
+	{
+	}
+};
+
+//typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> StdPZVal;
 typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyNone, ZValAdoptionPolicyWriteThrough> PZValWrapper;
 
 #endif /* PZVAL_H_ */

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cstring>
 #include <cpptest.h>
 #include "embed.h"
@@ -166,26 +165,30 @@ void Test_PZVal::testOperators(void)
 		zval* za;
 		zval* zb;
 
-		MAKE_STD_ZVAL(za);
-		MAKE_STD_ZVAL(zb);
+		ALLOC_INIT_ZVAL(za);
+		ALLOC_INIT_ZVAL(zb);
 
 		{
 			PZValWrapper a(za);
 			PZValWrapper b(zb);
 			TEST_ASSERT(a.refCount() == 1);
 			TEST_ASSERT(b.refCount() == 1);
+			TEST_ASSERT(a.type() == IS_NULL);
+			TEST_ASSERT(b.type() == IS_NULL);
 
 			a = 1;
 			b = 2;
+
+			TEST_ASSERT(a.refCount() == 1);
+			TEST_ASSERT(b.refCount() == 1);
+
 			StdPZVal c = StdPZVal::create();
-			std::cerr << "RC: " << c.refCount() << std::endl;
-			std::cerr << "Type: " << c.type() << std::endl;
-			std::cout << "c = a+b" << std::endl;
-			c = a + b;
-			std::cerr << "RC: " << c.refCount() << std::endl;
 			TEST_ASSERT(c.refCount() == 1);
-			std::cerr << "Type: " << c.type() << std::endl;
+
+			c = a + b;
+			TEST_ASSERT(c.refCount() == 1);
 			TEST_ASSERT(c.type() == IS_LONG);
+			TEST_ASSERT(c.asInteger() == 3);
 		}
 
 		TEST_ASSERT(Z_REFCOUNT_P(za) == 1);
