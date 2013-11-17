@@ -11,6 +11,7 @@ extern "C" {
 #include "zval/AllocationPolicies.h"
 #include "zval/FreePolicies.h"
 #include "zval/AdoptionPolicies.h"
+#include "EString.h"
 #include "HashTable.h"
 
 template<typename AllocationPolicy, typename FreePolicy, typename AdoptionPolicy>
@@ -382,29 +383,29 @@ public:
 		}
 	}
 
-	char* asString(bool convert = true)
+	EString asString(bool convert = true)
 	{
 		if (convert) {
 			switch (this->type()) {
 				case IS_NULL:
-					return STR_EMPTY_ALLOC();
+					return EString();
 
 				case IS_STRING:
-					return estrndup(Z_STRVAL_P(this->m_z), Z_STRLEN_P(this->m_z));
+					return EString(Z_STRVAL_P(this->m_z), Z_STRLEN_P(this->m_z));
 
 				default: {
 					zval copy;
 					ZVAL_COPY_VALUE(&copy, this->m_z);
 					zval_copy_ctor(&copy);
 					convert_to_string(&copy);
-					char* res = estrndup(Z_STRVAL(copy), Z_STRLEN(copy));
+					EString res(Z_STRVAL(copy), Z_STRLEN(copy));
 					zval_dtor(&copy);
 					return res;
 				}
 			}
 		}
 		else {
-			return (this->type() == IS_STRING) ? Z_STRVAL_P(this->m_z) : 0;
+			return (this->type() == IS_STRING) ? EString(Z_STRVAL_P(this->m_z), Z_STRLEN_P(this->m_z)) : EString();
 		}
 	}
 
@@ -714,24 +715,6 @@ public:
 	{
 	}
 
-//	template<typename I, typename D, typename A>
-//	StdPZVal& operator=(const PZVal<I, D, A>& other)
-//	{
-//		assert(this->m_z != NULL);
-//
-//		if (this->refCount() != 1) {
-//			this->delRef();
-//			this->m_z = ZValAllocationPolicyPerRequest::allocate();
-//		}
-//		else {
-//			zval_dtor(this->m_z);
-//		}
-//
-//		zval* tmp = const_cast<zval*>(other);
-//		ZValAdoptionPolicyRef::adopt(&this->m_z, tmp);
-//		return *this;
-//	}
-
 	template<typename I1, typename D1, typename A1, typename I2, typename D2, typename A2>
 	friend StdPZVal operator+(const PZVal<I1, D1, A1>& lhs, const PZVal<I2, D2, A2>& rhs)
 	{
@@ -743,12 +726,37 @@ public:
 
 protected:
 	StdPZVal(zval* z, int)
-		: PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef>(z, 1)
+		: parent(z, 1)
 	{
 	}
 };
 
-//typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyStandard, ZValAdoptionPolicyRef> StdPZVal;
-typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyNone, ZValAdoptionPolicyWriteThrough> PZValWrapper;
+class PZValWrapper : public PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyNone, ZValAdoptionPolicyWriteThrough> {
+private:
+	typedef PZVal<ZValAllocationPolicyPerRequest, ZValFreePolicyNone, ZValAdoptionPolicyWriteThrough> parent;
+public:
+	explicit PZValWrapper(zval* z)
+		: parent(z)
+	{
+	}
+
+	PZValWrapper(const PZValWrapper& other)
+		: parent(other)
+	{
+	}
+
+	PZValWrapper& operator=(int v)
+	{
+		this->prepareToAssignment();
+		ZVAL_LONG(this->m_z, v);
+		return *this;
+	}
+
+protected:
+	PZValWrapper(zval* z, int)
+		: parent(z, 1)
+	{
+	}
+};
 
 #endif /* PZVAL_H_ */

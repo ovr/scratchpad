@@ -30,6 +30,7 @@ void Test_PZVal::testCreation(void)
 		TEST_ASSERT(z_null.type() == IS_NULL);
 		TEST_ASSERT(z_null.refCount() == 1);
 		TEST_ASSERT(z_null.isRef() == false);
+		TEST_ASSERT(z_null.asString().empty() == true);
 
 		StdPZVal z_bool = StdPZVal::create(true);
 		TEST_ASSERT(z_bool.type() == IS_BOOL);
@@ -44,6 +45,7 @@ void Test_PZVal::testCreation(void)
 		TEST_ASSERT(z_long.asInteger() == z_long.getLong());
 		TEST_ASSERT(z_long.refCount() == 1);
 		TEST_ASSERT(z_long.isRef() == false);
+		TEST_ASSERT(z_long.asString() == "12345678");
 
 		StdPZVal z_double = StdPZVal::create(12345.5);
 		TEST_ASSERT(z_double.type() == IS_DOUBLE);
