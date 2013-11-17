@@ -10,7 +10,7 @@ extern "C" {
 }
 
 template<typename T>
-class Allocator {
+class EMallocAllocator {
 public:
 	typedef T value_type;
 	typedef value_type* pointer;
@@ -23,23 +23,23 @@ public:
 	// convert an allocator<T> to allocator<U>
 	template<typename U>
 	struct rebind {
-		typedef Allocator<U> other;
+		typedef EMallocAllocator<U> other;
 	};
 
-	explicit Allocator(void)
+	EMallocAllocator(void)
 	{
 	}
 
-	~Allocator(void)
+	~EMallocAllocator(void)
 	{
 	}
 
-	explicit Allocator(const Allocator&)
+	EMallocAllocator(const EMallocAllocator&)
 	{
 	}
 
 	template<typename U>
-	explicit Allocator(const Allocator<U>&)
+	EMallocAllocator(const EMallocAllocator<U>&)
 	{
 	}
 
@@ -83,12 +83,12 @@ public:
 		p->~T();
 	}
 
-	bool operator==(const Allocator&)
+	bool operator==(const EMallocAllocator&) const
 	{
 		return true;
 	}
 
-	bool operator!=(const Allocator& a)
+	bool operator!=(const EMallocAllocator& a) const
 	{
 		return !operator==(a);
 	}
